@@ -96,36 +96,47 @@ class qa_category_email_notifications_event
         {
                 if (qa_to_override(__FUNCTION__)) { $args=func_get_args(); return qa_call_override(__FUNCTION__, $args); }
 
-                require_once QA_INCLUDE_DIR.'qa-class.phpmailer.php';
+                require_once QA_INCLUDE_DIR . 'vendor/PHPMailer/PHPMailerAutoload.php';
 
+                PHPMailer::$validator = 'php';
                 $mailer=new PHPMailer();
                 $mailer->CharSet='utf-8';
 
                 $mailer->From=$params['fromemail'];
                 $mailer->Sender=$params['fromemail'];
                 $mailer->FromName=$params['fromname'];
-		if (isset($params['toemail']))
-		{
-                	$mailer->AddAddress($params['toemail'], $params['toname']);
-		}
+                if (isset($params['toemail']))
+                {
+                        $mailer->AddAddress($params['toemail'], $params['toname']);
+                }
                 $mailer->Subject=$params['subject'];
                 $mailer->Body=$params['body'];
-		if (isset($params['bcclist']))
-		{
-			foreach ($params['bcclist'] as $email)
-				$mailer->AddBCC($email);
-		}
+                if (isset($params['bcclist'])) {
+                        foreach ($params['bcclist'] as $email) {
+                                $mailer->AddBCC($email);
+                        }
+                }
 
-                if ($params['html'])
-                        $mailer->IsHTML(true);
+                if ($params['html']) {
+                        $mailer->isHTML(true);
+                }
 
                 if (qa_opt('smtp_active')) {
-                        $mailer->IsSMTP();
+                        $mailer->isSMTP();
                         $mailer->Host=qa_opt('smtp_address');
                         $mailer->Port=qa_opt('smtp_port');
 
-                        if (qa_opt('smtp_secure'))
+                        if (qa_opt('smtp_secure')) {
                                 $mailer->SMTPSecure=qa_opt('smtp_secure');
+                        } else {
+                                $mailer->SMTPOptions = array(
+                                        'ssl' => array(
+                                                'verify_peer' => false,
+                                                'verify_peer_name' => false,
+                                                'allow_self_signed' => true,
+                                        ),
+                                );
+                        }
 
                         if (qa_opt('smtp_authenticate')) {
                                 $mailer->SMTPAuth=true;
@@ -134,7 +145,13 @@ class qa_category_email_notifications_event
                         }
                 }
 
-                return $mailer->Send();
+                $send_status = $mailer->send();
+                if (!$send_status) {
+                        @error_log(
+                                'PHP Question2Answer email send error: ' . $mailer->ErrorInfo
+                        );
+                }
+                return $send_status;
         }
 
 };
